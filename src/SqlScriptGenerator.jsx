@@ -352,7 +352,7 @@ export default function SqlScriptGenerator() {
               </p>
             </div>
           </div>
-          <img src={sagitecLogo} alt="Sagitec" style={{ height: 36, flexShrink: 0 }} />
+          <img src={sagitecLogo} alt="Sagitec" style={{ height: 40, flexShrink: 0 }} />
         </div>
       </div>
 
