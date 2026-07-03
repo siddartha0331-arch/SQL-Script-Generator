@@ -367,11 +367,14 @@ export default function SqlScriptGenerator() {
           width: "100%",
           boxSizing: "border-box",
           background: `linear-gradient(135deg, ${theme.headerBgFrom}, ${theme.headerBgTo})`,
-          padding: "18px 28px",
+          padding: "0 28px",     // removed vertical padding — height now controls that instead
+          height: 90,             // ← NEW: fixed height on the outer band
           marginBottom: 20,
+          display: "flex",        // ← NEW: needed so alignItems below can vertically center content
+          alignItems: "center",   // ← NEW: centers everything inside this fixed-height band
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div>
               <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.01em", color: theme.headerText }}>
@@ -382,7 +385,15 @@ export default function SqlScriptGenerator() {
               </p>
             </div>
           </div>
-          <img src={sagitecLogo} alt="Sagitec" style={{ height: 50, flexShrink: 0 }} />
+      
+          {/* Logo wrapper — this is the key fix */}
+          <div style={{ height: 65, display: "flex", alignItems: "center", flexShrink: 0 }}>
+            <img
+              src={sagitecLogo}
+              alt="Sagitec"
+              style={{ height: "100%", width: "auto" }}
+            />
+          </div>
         </div>
       </div>
 
@@ -840,8 +851,8 @@ export default function SqlScriptGenerator() {
                       </div>
                       <pre
                         style={{
-                          background: theme.codeBg,
-                          border: `1px solid ${theme.codeBorder}`,
+                          background: theme.panelBg,    
+                          border: `1px solid ${theme.panelBorder}`,
                           borderRadius: 10,
                           padding: "14px 14px 20px",
                           fontSize: 11.5,
