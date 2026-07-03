@@ -1,34 +1,36 @@
 export const theme = {
-  pageBg: "#F3F5F9",
+  pageBg: "#FFF7F0",
   cardBg: "#FFFFFF",
-  cardBorder: "#E3E7EF",
+  cardBorder: "#F1D9C2",
   cardShadow: "0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)",
 
   textPrimary: "#1B2437",
   textSecondary: "#6B7488",
   textMuted: "#9AA3B5",
 
-  brandBlue: "#0B5FA5",
-  brandBlueDark: "#084A82",
-  brandBlueLight: "#EAF3FC",
-  brandBlueBorder: "#BFDBF7",
+  // Brand is now ORANGE (used by left/right panels, primary buttons, highlights)
+  brandBlue: "#EA7A1E",
+  brandBlueDark: "#C25E0F",
+  brandBlueLight: "#FFF1E2",
+  brandBlueBorder: "#F6C79A",
 
+  // Header keeps the deep blue for contrast against orange panels
   headerBgFrom: "#0B5FA5",
   headerBgTo: "#073E68",
   headerText: "#FFFFFF",
   headerSubtext: "#CFE3F7",
 
-  accentOrange: "#F2994A",
-  accentOrangeDark: "#D9822B",
+  // Accent is now BLUE (used where orange was previously the accent)
+  accentOrange: "#0B5FA5",
+  accentOrangeDark: "#084A82",
 
   success: "#1E9E6A",
   successBg: "#E9F8F1",
-
   danger: "#D64545",
   dangerBg: "#FDEEEE",
   dangerBorder: "#F6C6C6",
 
-  codeBg: "#F6F8FB",
-  codeBorder: "#E1E6EF",
+  codeBg: "#FFF7F0",
+  codeBorder: "#F1D9C2",
   codeText: "#1F2A44",
 };
