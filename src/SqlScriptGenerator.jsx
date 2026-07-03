@@ -288,7 +288,16 @@ export default function SqlScriptGenerator() {
     setPreviewSheetId(null);
   };
 
-  const panelStyle = {
+  const orangePanelStyle = {
+    background: theme.panelBg,
+    border: `1px solid ${theme.panelBorder}`,
+    borderRadius: 12,
+    padding: 16,
+    minWidth: 0,
+  };
+
+  // This will be used for the Middle (Configure + Preview) panels
+  const bluePanelStyle = {
     background: theme.cardBg,
     border: `1px solid ${theme.cardBorder}`,
     borderRadius: 12,
@@ -484,7 +493,7 @@ export default function SqlScriptGenerator() {
               }}
             >
               {/* LEFT: sheet list */}
-              <div style={panelStyle}>
+              <div style={orangePanelStyle}>
                 <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 10px", fontWeight: 700 }}>
                   Sheets
                 </p>
@@ -591,7 +600,7 @@ export default function SqlScriptGenerator() {
 
               {/* MIDDLE: configure (top) + preview (below) */}
               <div style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
-                <div style={panelStyle}>
+                <div style={bluePanelStyle}>
                   {!activeSheet ? (
                     <p style={{ fontSize: 13, color: theme.textSecondary }}>No sheet selected.</p>
                   ) : (
@@ -790,7 +799,7 @@ export default function SqlScriptGenerator() {
                   )}
                 </div>
 
-                <div style={panelStyle}>
+                <div style={bluePanelStyle}>
                   <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 12px", fontWeight: 700 }}>
                     Preview
                   </p>
@@ -842,7 +851,7 @@ export default function SqlScriptGenerator() {
               </div>
 
               {/* RIGHT: export */}
-              <div style={panelStyle}>
+              <div style={orangePanelStyle}>
                 <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 12px", fontWeight: 700 }}>
                   Export
                 </p>
@@ -864,7 +873,7 @@ export default function SqlScriptGenerator() {
                         padding: "10px 14px",
                         borderRadius: 8,
                         background: theme.accentOrange,
-                        color: "#fff",
+                        color: "#ffffff",
                         fontWeight: 700,
                         fontSize: 13,
                         border: "none",
