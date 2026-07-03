@@ -20,6 +20,7 @@ import { theme } from "./theme";
 import { buildTableScript, downloadTextFile } from "./utils/sqlHelpers";
 import { MultiSelectDropdown } from "./components/MultiSelectDropdown";
 import { DataPreviewModal } from "./components/DataPreviewModal";
+import sagitecLogo from "./sagitec-logo.png";
 
 export default function SqlScriptGenerator() {
   const [sheets, setSheets] = useState([]);
@@ -342,7 +343,6 @@ export default function SqlScriptGenerator() {
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="/sagitec-logo.png" alt="Sagitec" style={{ height: 36, flexShrink: 0 }} />
             <div>
               <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.01em", color: theme.headerText }}>
                 SQL Script Generator
@@ -352,6 +352,7 @@ export default function SqlScriptGenerator() {
               </p>
             </div>
           </div>
+          <img src={sagitecLogo} alt="Sagitec" style={{ height: 36, flexShrink: 0 }} />
         </div>
       </div>
 
