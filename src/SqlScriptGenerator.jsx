@@ -47,6 +47,17 @@ export default function SqlScriptGenerator() {
   }, [activeId]);
 
   useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError("");
+      }, 10000); // 10 seconds
+      
+      // This cleanup function runs if 'error' changes before 10s is up
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  useEffect(() => {
     const prevBodyBg = document.body.style.background;
     const prevHtmlBg = document.documentElement.style.background;
     document.body.style.background = theme.pageBg;
@@ -205,45 +216,55 @@ export default function SqlScriptGenerator() {
   };
 
   const generateForActiveSheet = () => {
-    if (!activeSheet) return;
-    const cfg = configs[activeSheet.id];
-    for (const col of cfg.keyColumns) {
-      const hasEmpty = activeSheet.rows.some(
-        (row) => row[col] === null || row[col] === undefined || String(row[col]).trim() === ""
-      );
-      if (hasEmpty) {
-        setError(`Error: The column "${col}" selected in your WHERE clause contains empty values. Please clean your data.`);
-        return;
-      }
-    }
-    if (!cfg.tableName.trim()) {
-      setError("Table name can't be empty.");
-      return;
-    }
-    if (cfg.keyColumns.size === 0) {
-      setError(
-        `Pick at least one key column for "${cfg.tableName}" — it's used in the duplicate check (IF NOT EXISTS).`
-      );
-      return;
-    }
-    if (cfg.insertColumns.size === 0) {
-      setError(`Select at least one column to include in the INSERT for "${cfg.tableName}".`);
-      return;
-    }
-    setError("");
-    const script = buildTableScript(
-      activeSheet,
-      cfg.tableName.trim(),
-      Array.from(cfg.keyColumns),
-      cfg.insertColumns,
-      cfg.columnNameOverrides || {},
-      cfg.identityInsert
+  if (!activeSheet) return;
+  const cfg = configs[activeSheet.id];
+  
+  // 1. Check for empty values in selected key columns
+  for (const col of cfg.keyColumns) {
+    const hasEmpty = activeSheet.rows.some(
+      (row) => row[col] === null || row[col] === undefined || String(row[col]).trim() === ""
     );
-    setConfigs((prev) => ({
-      ...prev,
-      [activeSheet.id]: { ...prev[activeSheet.id], generated: script },
-    }));
-  };
+    
+    if (hasEmpty) {
+      setError(`Error: The column "${col}" selected in your WHERE clause contains empty values. Please clean your data.`);
+      return;
+    } else {
+      // Optional: Log or notify that the column is clean
+      console.log(`Success: Column "${col}" has no empty values.`);
+    }
+  }
+
+  // 2. Validate other inputs
+  if (!cfg.tableName.trim()) {
+    setError("Table name can't be empty.");
+    return;
+  }
+  if (cfg.keyColumns.size === 0) {
+    setError(`Pick at least one key column for "${cfg.tableName}".`);
+    return;
+  }
+  if (cfg.insertColumns.size === 0) {
+    setError(`Select at least one column to include.`);
+    return;
+  }
+  
+  setError("");
+  
+  // Proceed with generation...
+  const script = buildTableScript(
+    activeSheet,
+    cfg.tableName.trim(),
+    Array.from(cfg.keyColumns),
+    cfg.insertColumns,
+    cfg.columnNameOverrides || {},
+    cfg.identityInsert
+  );
+  
+  setConfigs((prev) => ({
+    ...prev,
+    [activeSheet.id]: { ...prev[activeSheet.id], generated: script },
+  }));
+};
 
   const generatedSheets = useMemo(
     () => sheets.filter((s) => configs[s.id]?.generated),
@@ -799,7 +820,7 @@ export default function SqlScriptGenerator() {
                   )}
                 </div>
 
-                <div style={bluePanelStyle}>
+                <div style={orangePanelStyle}>
                   <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 12px", fontWeight: 700 }}>
                     SQL Preview
                   </p>
