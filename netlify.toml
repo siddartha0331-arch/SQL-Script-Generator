@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA fallback — without this, refreshing on any route other than "/"
+# would 404 on Netlify's server, since there's no matching physical file.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
