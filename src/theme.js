@@ -1,4 +1,5 @@
 export const theme = {
+  
   pageBg: "#F3F5F9",
   cardBg: "#FFFFFF",
   cardBorder: "#E3E7EF",
@@ -8,6 +9,7 @@ export const theme = {
   textSecondary: "#6B7488",
   textMuted: "#9AA3B5",
 
+  // Blue kept for header + center panel (unchanged)
   brandBlue: "#0B5FA5",
   brandBlueDark: "#084A82",
   brandBlueLight: "#EAF3FC",
@@ -18,12 +20,17 @@ export const theme = {
   headerText: "#FFFFFF",
   headerSubtext: "#CFE3F7",
 
+  // Orange — use these ONLY on the Sheets (left) and Export (right) panels
   accentOrange: "#F2994A",
   accentOrangeDark: "#D9822B",
+  panelBg: "#FFF7F0",
+  panelBorder: "#F1D9C2",
+  panelAccent: "#F2994A",
+  panelAccentDark: "#D9822B",
+  panelAccentText: "#8A4A12",
 
   success: "#1E9E6A",
   successBg: "#E9F8F1",
-
   danger: "#D64545",
   dangerBg: "#FDEEEE",
   dangerBorder: "#F6C6C6",
