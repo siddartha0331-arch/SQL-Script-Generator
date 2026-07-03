@@ -494,7 +494,7 @@ export default function SqlScriptGenerator() {
             >
               {/* LEFT: sheet list */}
               <div style={orangePanelStyle}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 10px", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 10px", fontWeight: 700 }}>
                   Sheets
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -600,12 +600,12 @@ export default function SqlScriptGenerator() {
 
               {/* MIDDLE: configure (top) + preview (below) */}
               <div style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
-                <div style={bluePanelStyle}>
+                <div style={orangePanelStyle}>
                   {!activeSheet ? (
                     <p style={{ fontSize: 13, color: theme.textSecondary }}>No sheet selected.</p>
                   ) : (
                     <>
-                      <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 12px", fontWeight: 700 }}>
+                      <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 12px", fontWeight: 700 }}>
                         Configure
                       </p>
 
@@ -785,7 +785,7 @@ export default function SqlScriptGenerator() {
                           width: "100%",
                           padding: "10px 18px",
                           borderRadius: 8,
-                          background: theme.brandBlue,
+                          background: theme.accentOrange,
                           color: "#fff",
                           fontSize: 13,
                           fontWeight: 700,
@@ -800,8 +800,8 @@ export default function SqlScriptGenerator() {
                 </div>
 
                 <div style={bluePanelStyle}>
-                  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 12px", fontWeight: 700 }}>
-                    Preview
+                  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 12px", fontWeight: 700 }}>
+                    SQL Preview
                   </p>
                   {activeConfig?.generated ? (
                     <>
@@ -852,7 +852,7 @@ export default function SqlScriptGenerator() {
 
               {/* RIGHT: export */}
               <div style={orangePanelStyle}>
-                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.textMuted, margin: "0 0 12px", fontWeight: 700 }}>
+                <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 12px", fontWeight: 700 }}>
                   Export
                 </p>
 
@@ -872,7 +872,7 @@ export default function SqlScriptGenerator() {
                         gap: 6,
                         padding: "10px 14px",
                         borderRadius: 8,
-                        background: theme.accentOrange,
+                        background: theme.brandBlue,
                         color: "#ffffff",
                         fontWeight: 700,
                         fontSize: 13,
