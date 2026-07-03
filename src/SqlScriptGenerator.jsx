@@ -411,9 +411,11 @@ export default function SqlScriptGenerator() {
               handleFiles(e.dataTransfer.files);
             }}
             style={{
+              maxWidth: 520,
+              margin: "40px auto 0",
               border: `2px dashed ${isDragging ? theme.brandBlue : theme.cardBorder}`,
               borderRadius: 14,
-              padding: "56px 24px",
+              padding: "40px 24px",
               textAlign: "center",
               background: isDragging ? theme.brandBlueLight : theme.cardBg,
               boxShadow: theme.cardShadow,
