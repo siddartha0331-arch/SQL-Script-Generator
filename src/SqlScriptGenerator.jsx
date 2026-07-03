@@ -342,21 +342,7 @@ export default function SqlScriptGenerator() {
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                background: "rgba(255,255,255,0.16)",
-                border: "1px solid rgba(255,255,255,0.28)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Database size={20} color="#FFFFFF" />
-            </div>
+            <img src="/sagitec-logo.png" alt="Sagitec" style={{ height: 36, flexShrink: 0 }} />
             <div>
               <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.01em", color: theme.headerText }}>
                 SQL Script Generator
@@ -365,19 +351,6 @@ export default function SqlScriptGenerator() {
                 Convert spreadsheet data to database-ready SQL in seconds.
               </p>
             </div>
-          </div>
-          <div
-            style={{
-              padding: "8px 16px",
-              background: "#fff",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 700,
-              color: theme.brandBlueDark,
-              letterSpacing: "0.02em",
-            }}
-          >
-            YourCo
           </div>
         </div>
       </div>
