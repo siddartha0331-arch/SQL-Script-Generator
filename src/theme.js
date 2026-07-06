@@ -1,6 +1,6 @@
 export const theme = {
   
-  pageBg: "#F3F5F9",
+  pageBg: "#0B1220",
   cardBg: "#FFFFFF",
   cardBorder: "#E3E7EF",
   cardShadow: "0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)",
