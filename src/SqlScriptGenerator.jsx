@@ -826,7 +826,7 @@ export default function SqlScriptGenerator() {
                         }}
                       >
                         <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.brandBlueDark }}>
-                          Use Custom SQL Template
+                          Custom SQL Template
                         </span>
                         <button
                           onClick={() =>
