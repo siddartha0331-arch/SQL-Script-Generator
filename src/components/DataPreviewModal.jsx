@@ -98,7 +98,7 @@ export function DataPreviewModal({ sheet, onClose }) {
             </thead>
             <tbody>
               {previewRows.map((row, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? theme.cardBg : "#FBFCFE" }}>
+                <tr key={i} style={{ background: i % 2 === 0 ? theme.cardBg : theme.inputBg }}>
                   {sheet.headers.map((h) => (
                     <td
                       key={h}
