@@ -20,15 +20,24 @@ import { theme } from "./theme";
 import {
   buildTableScript,
   downloadTextFile,
+  // NEW — Custom SQL Template feature
   validateTemplate,
   generateCustomSQL,
   getUniqueColumnValues,
   filterRowsByColumnValues,
-  getEffectiveTemplate,
+  buildTemplateFromGuided,
 } from "./utils/sqlHelpers";
 import { MultiSelectDropdown } from "./components/MultiSelectDropdown";
 import { DataPreviewModal } from "./components/DataPreviewModal";
-import sagitecLogo from "./sagitec-logo.png";   
+import sagitecLogo from "./sagitec-logo.png";
+
+/* ============================================================
+   NEW — ValueSearchPicker
+   Small searchable checkbox list used by the row filter to find
+   specific values (e.g. type "1002" to find MemberId 1002 instead
+   of scrolling through hundreds of rows). Kept local to this file
+   since nothing else uses it.
+   ============================================================ */
 function ValueSearchPicker({ options, selected, onToggle }) {
   const [search, setSearch] = useState("");
 
@@ -50,8 +59,7 @@ function ValueSearchPicker({ options, selected, onToggle }) {
           padding: "7px 10px",
           borderRadius: 6,
           border: `1px solid ${theme.cardBorder}`,
-          background: theme.inputBg,
-          color: theme.textPrimary,
+          background: "#fff",
           fontSize: 12,
           boxSizing: "border-box",
           marginBottom: 6,
@@ -64,7 +72,7 @@ function ValueSearchPicker({ options, selected, onToggle }) {
           border: `1px solid ${theme.cardBorder}`,
           borderRadius: 6,
           padding: 4,
-          background: theme.inputBg,
+          background: "#fff",
         }}
       >
         {filtered.length === 0 ? (
@@ -73,7 +81,7 @@ function ValueSearchPicker({ options, selected, onToggle }) {
           filtered.map((v) => (
             <label
               key={String(v)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 4px", fontSize: 11.5, cursor: "pointer", color: theme.textPrimary }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 4px", fontSize: 11.5, cursor: "pointer" }}
             >
               <input
                 type="checkbox"
@@ -90,6 +98,12 @@ function ValueSearchPicker({ options, selected, onToggle }) {
   );
 }
 
+/* ============================================================
+   NEW — ColumnCheckboxGrid
+   Reusable checkbox grid for the Guided Builder's three pickers
+   (INSERT columns, SET columns, WHERE columns). One implementation,
+   three uses, so they always look and behave identically.
+   ============================================================ */
 function ColumnCheckboxGrid({ headers, selected, onToggle }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6, maxHeight: 150, overflowY: "auto", paddingRight: 2 }}>
@@ -105,8 +119,7 @@ function ColumnCheckboxGrid({ headers, selected, onToggle }) {
               padding: "6px 8px",
               borderRadius: 6,
               border: `1px solid ${checked ? theme.brandBlue : theme.cardBorder}`,
-              background: checked ? theme.brandBlueLight : theme.inputBg,
-              color: theme.textPrimary,
+              background: checked ? theme.brandBlueLight : "#fff",
               fontSize: 11.5,
               cursor: "pointer",
             }}
@@ -134,6 +147,7 @@ export default function SqlScriptGenerator() {
 
   const [previewSheetId, setPreviewSheetId] = useState(null);
 
+  // NEW — collapsible help guide shown inside Raw SQL mode
   const [showCustomSqlHelp, setShowCustomSqlHelp] = useState(false);
 
   const fileBatchRef = useRef(0);
@@ -150,7 +164,9 @@ export default function SqlScriptGenerator() {
     if (error) {
       const timer = setTimeout(() => {
         setError("");
-      }, 10000);
+      }, 10000); // 10 seconds
+
+      // This cleanup function runs if 'error' changes before 10s is up
       return () => clearTimeout(timer);
     }
   }, [error]);
@@ -197,13 +213,14 @@ export default function SqlScriptGenerator() {
         columnNameOverrides: {},
         identityInsert: false,
         generated: null,
+        // NEW — Custom SQL Template feature, one independent config per sheet
         customSqlEnabled: false,
-        customOperation: "INSERT",
+        customOperation: "INSERT", // "INSERT" | "UPDATE" | "DELETE"
         customTemplate: "",
-        builderMode: "guided",
         guidedInsertColumns: new Set(s.headers),
         guidedSetColumns: new Set(),
         guidedWhereColumns: new Set(),
+        // NEW — optional row filter: generate for only selected rows, not all
         rowFilterEnabled: false,
         rowFilterColumn: "",
         rowFilterValues: new Set(),
@@ -289,11 +306,42 @@ export default function SqlScriptGenerator() {
     });
   };
 
+  // Plain Set-toggle — used only by the row filter (rowFilterValues),
+  // which has nothing to do with the SQL template text.
   const toggleGuidedField = (id, field, val) => {
     setConfigs((prev) => {
       const set = new Set(prev[id][field]);
       set.has(val) ? set.delete(val) : set.add(val);
       return { ...prev, [id]: { ...prev[id], [field]: set, generated: null } };
+    });
+  };
+
+  // NEW — toggles a template-builder checkbox (INSERT/SET/WHERE column) AND
+  // immediately rebuilds customTemplate from the updated selections. This is
+  // what makes the textarea "start correct" every time you check a box —
+  // but once you type into the textarea by hand, nothing overwrites it again
+  // until you toggle another checkbox (an explicit, expected regenerate).
+  const toggleGuidedColumn = (id, field, col) => {
+    setConfigs((prev) => {
+      const cfg = prev[id];
+      const set = new Set(cfg[field]);
+      set.has(col) ? set.delete(col) : set.add(col);
+
+      let newTemplate = cfg.customTemplate;
+      if (cfg.customOperation === "INSERT" && field === "guidedInsertColumns") {
+        newTemplate = buildTemplateFromGuided("INSERT", cfg.tableName, set, null);
+      } else if (cfg.customOperation === "UPDATE") {
+        const setCols = field === "guidedSetColumns" ? set : cfg.guidedSetColumns;
+        const whereCols = field === "guidedWhereColumns" ? set : cfg.guidedWhereColumns;
+        newTemplate = buildTemplateFromGuided("UPDATE", cfg.tableName, setCols, whereCols);
+      } else if (cfg.customOperation === "DELETE" && field === "guidedWhereColumns") {
+        newTemplate = buildTemplateFromGuided("DELETE", cfg.tableName, null, set);
+      }
+
+      return {
+        ...prev,
+        [id]: { ...cfg, [field]: set, customTemplate: newTemplate, generated: null },
+      };
     });
   };
 
@@ -335,9 +383,14 @@ export default function SqlScriptGenerator() {
     if (!activeSheet) return;
     const cfg = configs[activeSheet.id];
 
+    // ============================================================
+    // NEW — Custom SQL Template path. getEffectiveTemplate() resolves
+    // to either the Guided-Builder output or the Raw textarea content,
+    // and validateTemplate() ALWAYS runs first. If it fails, `generated`
+    // is never set, so nothing dangerous reaches Export.
+    // ============================================================
     if (cfg.customSqlEnabled) {
-      const effectiveTemplate = getEffectiveTemplate(cfg);
-      const validation = validateTemplate(effectiveTemplate, cfg.customOperation);
+      const validation = validateTemplate(cfg.customTemplate, cfg.customOperation);
       if (!validation.valid) {
         setError(validation.message);
         return;
@@ -353,7 +406,7 @@ export default function SqlScriptGenerator() {
       }
 
       setError("");
-      const script = generateCustomSQL(effectiveTemplate, targetRows);
+      const script = generateCustomSQL(cfg.customTemplate, targetRows);
       setConfigs((prev) => ({
         ...prev,
         [activeSheet.id]: { ...prev[activeSheet.id], generated: script },
@@ -361,6 +414,10 @@ export default function SqlScriptGenerator() {
       return;
     }
 
+    // ============================================================
+    // EXISTING — default generator path (unchanged from your original)
+    // ============================================================
+    // 1. Check for empty values in selected key columns
     for (const col of cfg.keyColumns) {
       const hasEmpty = activeSheet.rows.some(
         (row) => row[col] === null || row[col] === undefined || String(row[col]).trim() === ""
@@ -370,10 +427,12 @@ export default function SqlScriptGenerator() {
         setError(`Error: The column "${col}" selected in your WHERE clause contains empty values. Please clean your data.`);
         return;
       } else {
+        // Optional: Log or notify that the column is clean
         console.log(`Success: Column "${col}" has no empty values.`);
       }
     }
 
+    // 2. Validate other inputs
     if (!cfg.tableName.trim()) {
       setError("Table name can't be empty.");
       return;
@@ -389,6 +448,7 @@ export default function SqlScriptGenerator() {
 
     setError("");
 
+    // Proceed with generation...
     const script = buildTableScript(
       activeSheet,
       cfg.tableName.trim(),
@@ -418,10 +478,14 @@ export default function SqlScriptGenerator() {
       .join("\n\n");
   }, [generatedSheets, configs]);
 
+  // NEW — live preview for the Custom SQL panel: row/statement count,
+  // which {{tags}} are used, unknown-column warnings, and current
+  // validation state. Computed from the SAME getEffectiveTemplate()
+  // that generation uses, so preview and reality can never disagree.
   const customSqlPreview = useMemo(() => {
     if (!activeSheet || !activeConfig?.customSqlEnabled) return null;
 
-    const template = getEffectiveTemplate(activeConfig);
+    const template = activeConfig.customTemplate || "";
     const operation = activeConfig.customOperation;
 
     const targetRows = activeConfig.rowFilterEnabled
@@ -444,6 +508,7 @@ export default function SqlScriptGenerator() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(""), 1500);
     } catch (e) {
+      /* clipboard can fail in sandboxed contexts; export still works */
     }
   };
 
@@ -474,6 +539,7 @@ export default function SqlScriptGenerator() {
     minWidth: 0,
   };
 
+  // This will be used for the Middle (Configure + Preview) panels
   const bluePanelStyle = {
     background: theme.cardBg,
     border: `1px solid ${theme.cardBorder}`,
@@ -517,16 +583,17 @@ export default function SqlScriptGenerator() {
         color: theme.textPrimary,
       }}
     >
+      {/* HEADER — full-bleed blue band */}
       <div
         style={{
           width: "100%",
           boxSizing: "border-box",
           background: `linear-gradient(135deg, ${theme.headerBgFrom}, ${theme.headerBgTo})`,
-          padding: "0 28px",     
-          height: 90,             
+          padding: "0 28px",     // removed vertical padding — height now controls that instead
+          height: 90,             // ← NEW: fixed height on the outer band
           marginBottom: 20,
-          display: "flex",        
-          alignItems: "center",   
+          display: "flex",        // ← NEW: needed so alignItems below can vertically center content
+          alignItems: "center",   // ← NEW: centers everything inside this fixed-height band
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
@@ -541,6 +608,7 @@ export default function SqlScriptGenerator() {
             </div>
           </div>
 
+          {/* Logo wrapper — this is the key fix */}
           <div style={{ height: 65, display: "flex", alignItems: "center", flexShrink: 0 }}>
             <img
               src={sagitecLogo}
@@ -620,6 +688,7 @@ export default function SqlScriptGenerator() {
               alignItems: "flex-start",
               fontSize: 13,
               color: theme.danger,
+              // NEW — SECURITY WARNING messages render bold for visibility
               fontWeight: error.startsWith("SECURITY WARNING") ? 700 : 400,
             }}
           >
@@ -681,6 +750,7 @@ export default function SqlScriptGenerator() {
                 alignItems: "start",
               }}
             >
+              {/* LEFT: sheet list */}
               <div style={orangePanelStyle}>
                 <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 10px", fontWeight: 700 }}>
                   Sheets
@@ -751,6 +821,7 @@ export default function SqlScriptGenerator() {
                                     >
                                       {cfg?.tableName || s.originalName}
                                     </span>
+                                    {/* NEW — badge shown when a sheet uses the Custom SQL feature */}
                                     {cfg?.customSqlEnabled && (
                                       <span
                                         title="Custom SQL Template"
@@ -803,6 +874,7 @@ export default function SqlScriptGenerator() {
                 </div>
               </div>
 
+              {/* MIDDLE: configure (top) + preview (below) */}
               <div style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
                 <div style={orangePanelStyle}>
                   {!activeSheet ? (
@@ -813,6 +885,9 @@ export default function SqlScriptGenerator() {
                         Configure
                       </p>
 
+                      {/* ============================================================
+                          NEW — Use Custom SQL Template toggle switch
+                          ============================================================ */}
                       <div
                         style={{
                           display: "flex",
@@ -826,7 +901,7 @@ export default function SqlScriptGenerator() {
                         }}
                       >
                         <span style={{ fontSize: 12.5, fontWeight: 600, color: theme.brandBlueDark }}>
-                          Custom SQL Template
+                          Use Custom SQL Template
                         </span>
                         <button
                           onClick={() =>
@@ -863,6 +938,9 @@ export default function SqlScriptGenerator() {
 
                       {activeConfig.customSqlEnabled ? (
                         <>
+                          {/* Operation type selector — picking a new operation also
+                              rebuilds the template from whatever columns are already
+                              checked for that operation. */}
                           <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
                             Operation type
                           </label>
@@ -870,7 +948,18 @@ export default function SqlScriptGenerator() {
                             {["INSERT", "UPDATE", "DELETE"].map((op) => (
                               <button
                                 key={op}
-                                onClick={() => updateConfig(activeSheet.id, { customOperation: op })}
+                                onClick={() => {
+                                  const cfg = configs[activeSheet.id];
+                                  let newTemplate = "";
+                                  if (op === "INSERT") {
+                                    newTemplate = buildTemplateFromGuided("INSERT", cfg.tableName, cfg.guidedInsertColumns, null);
+                                  } else if (op === "UPDATE") {
+                                    newTemplate = buildTemplateFromGuided("UPDATE", cfg.tableName, cfg.guidedSetColumns, cfg.guidedWhereColumns);
+                                  } else if (op === "DELETE") {
+                                    newTemplate = buildTemplateFromGuided("DELETE", cfg.tableName, null, cfg.guidedWhereColumns);
+                                  }
+                                  updateConfig(activeSheet.id, { customOperation: op, customTemplate: newTemplate });
+                                }}
                                 style={{
                                   flex: 1,
                                   padding: "6px 0",
@@ -879,7 +968,7 @@ export default function SqlScriptGenerator() {
                                   fontWeight: 700,
                                   cursor: "pointer",
                                   border: `1px solid ${activeConfig.customOperation === op ? theme.brandBlue : theme.cardBorder}`,
-                                  background: activeConfig.customOperation === op ? theme.brandBlue : theme.inputBg,
+                                  background: activeConfig.customOperation === op ? theme.brandBlue : "#FBFCFE",
                                   color: activeConfig.customOperation === op ? "#fff" : theme.textPrimary,
                                 }}
                               >
@@ -889,261 +978,198 @@ export default function SqlScriptGenerator() {
                           </div>
 
                           <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                            Template builder
+                            Table name
                           </label>
-                          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-                            {[
-                              { key: "guided", label: "Guided (pick columns)" },
-                              { key: "raw", label: "Raw SQL (advanced)" },
-                            ].map((m) => (
+                          <input
+                            type="text"
+                            value={activeConfig.tableName}
+                            onChange={(e) => updateConfig(activeSheet.id, { tableName: e.target.value })}
+                            style={{
+                              width: "100%",
+                              padding: "9px 12px",
+                              borderRadius: 8,
+                              border: `1px solid ${theme.cardBorder}`,
+                              background: "#FBFCFE",
+                              color: theme.textPrimary,
+                              fontSize: 13,
+                              fontFamily: "monospace",
+                              boxSizing: "border-box",
+                              marginBottom: 14,
+                            }}
+                          />
+
+                          {/* Column pickers — only the ones relevant to the chosen
+                              operation appear. Checking/unchecking a box rebuilds
+                              the template below; typing in the template afterward
+                              is never overwritten until a box changes again. */}
+                          {activeConfig.customOperation === "INSERT" && (
+                            <>
+                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
+                                Columns to INSERT
+                              </label>
+                              <div style={{ marginBottom: 14 }}>
+                                <ColumnCheckboxGrid
+                                  headers={activeSheet.headers}
+                                  selected={activeConfig.guidedInsertColumns}
+                                  onToggle={(h) => toggleGuidedColumn(activeSheet.id, "guidedInsertColumns", h)}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {activeConfig.customOperation === "UPDATE" && (
+                            <>
+                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
+                                Columns to SET (update)
+                              </label>
+                              <div style={{ marginBottom: 14 }}>
+                                <ColumnCheckboxGrid
+                                  headers={activeSheet.headers}
+                                  selected={activeConfig.guidedSetColumns}
+                                  onToggle={(h) => toggleGuidedColumn(activeSheet.id, "guidedSetColumns", h)}
+                                />
+                              </div>
+                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
+                                Match rows WHERE (usually your key column, e.g. MemberId)
+                              </label>
+                              <div style={{ marginBottom: 14 }}>
+                                <ColumnCheckboxGrid
+                                  headers={activeSheet.headers}
+                                  selected={activeConfig.guidedWhereColumns}
+                                  onToggle={(h) => toggleGuidedColumn(activeSheet.id, "guidedWhereColumns", h)}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          {activeConfig.customOperation === "DELETE" && (
+                            <>
+                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
+                                Match rows WHERE (usually your key column, e.g. MemberId)
+                              </label>
+                              <div style={{ marginBottom: 14 }}>
+                                <ColumnCheckboxGrid
+                                  headers={activeSheet.headers}
+                                  selected={activeConfig.guidedWhereColumns}
+                                  onToggle={(h) => toggleGuidedColumn(activeSheet.id, "guidedWhereColumns", h)}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          <button
+                            onClick={() => setShowCustomSqlHelp((v) => !v)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: 0,
+                              marginBottom: showCustomSqlHelp ? 8 : 14,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              color: theme.brandBlue,
+                            }}
+                          >
+                            <ChevronDown
+                              size={12}
+                              style={{
+                                transform: showCustomSqlHelp ? "rotate(0deg)" : "rotate(-90deg)",
+                                transition: "transform 0.2s",
+                              }}
+                            />
+                            How does this work?
+                          </button>
+
+                          {showCustomSqlHelp && (
+                            <div
+                              style={{
+                                marginBottom: 14,
+                                padding: "10px 12px",
+                                borderRadius: 8,
+                                background: "#FBFCFE",
+                                border: `1px solid ${theme.cardBorder}`,
+                                fontSize: 11.5,
+                                color: theme.textSecondary,
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              <b style={{ color: theme.textPrimary }}>What this does:</b> checking columns above
+                              builds a starting SQL template automatically — then you can edit the text below by
+                              hand if you need something the checkboxes can't express (a join, a custom condition, etc).
+                              <br /><br />
+                              <b style={{ color: theme.textPrimary }}>1. Check the columns you need</b> — the
+                              template below rebuilds itself each time.
+                              <br />
+                              <b style={{ color: theme.textPrimary }}>2. Edit freely</b> — your typing is never
+                              overwritten unless you check/uncheck a box again.
+                              <br />
+                              <b style={{ color: theme.textPrimary }}>3. UPDATE/DELETE require a WHERE clause</b> —
+                              otherwise every row in your real table is affected.
+                              <br />
+                              <b style={{ color: theme.textPrimary }}>4. Never wrap a{" "}
+                              <code style={{ background: theme.brandBlueLight, padding: "1px 4px", borderRadius: 3 }}>
+                                {"{{tag}}"}
+                              </code>{" "}
+                              in quotes</b> — quotes are added automatically for text values; adding your own
+                              doubles them up and breaks the SQL.
+                            </div>
+                          )}
+
+                          <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
+                            Available tags (click to insert at the end)
+                          </label>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
+                            {activeSheet.headers.map((h) => (
                               <button
-                                key={m.key}
-                                onClick={() => updateConfig(activeSheet.id, { builderMode: m.key })}
+                                key={h}
+                                onClick={() =>
+                                  updateConfig(activeSheet.id, {
+                                    customTemplate: (activeConfig.customTemplate || "") + `{{${h}}}`,
+                                  })
+                                }
                                 style={{
-                                  flex: 1,
-                                  padding: "7px 4px",
-                                  borderRadius: 6,
-                                  fontSize: 11,
-                                  fontWeight: 700,
+                                  fontSize: 10.5,
+                                  fontFamily: "monospace",
+                                  padding: "3px 7px",
+                                  borderRadius: 5,
+                                  border: `1px solid ${theme.brandBlueBorder}`,
+                                  background: theme.brandBlueLight,
+                                  color: theme.brandBlueDark,
                                   cursor: "pointer",
-                                  border: `1px solid ${activeConfig.builderMode === m.key ? theme.brandBlue : theme.cardBorder}`,
-                                  background: activeConfig.builderMode === m.key ? theme.brandBlue : theme.inputBg,
-                                  color: activeConfig.builderMode === m.key ? "#fff" : theme.textPrimary,
                                 }}
                               >
-                                {m.label}
+                                {`{{${h}}}`}
                               </button>
                             ))}
                           </div>
 
-                          {activeConfig.builderMode === "guided" ? (
-                            <>
-                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                Table name
-                              </label>
-                              <input
-                                type="text"
-                                value={activeConfig.tableName}
-                                onChange={(e) => updateConfig(activeSheet.id, { tableName: e.target.value })}
-                                style={{
-                                  width: "100%",
-                                  padding: "9px 12px",
-                                  borderRadius: 8,
-                                  border: `1px solid ${theme.cardBorder}`,
-                                  background: theme.inputBg,
-                                  color: theme.textPrimary,
-                                  fontSize: 13,
-                                  fontFamily: "monospace",
-                                  boxSizing: "border-box",
-                                  marginBottom: 14,
-                                }}
-                              />
+                          <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
+                            SQL template (auto-filled from your column picks above — edit freely)
+                          </label>
+                          <textarea
+                            value={activeConfig.customTemplate}
+                            onChange={(e) => updateConfig(activeSheet.id, { customTemplate: e.target.value })}
+                            placeholder="Check columns above to auto-fill this, or type your own SQL — don't wrap {{tags}} in quotes."
+                            rows={7}
+                            style={{
+                              width: "100%",
+                              padding: 10,
+                              borderRadius: 8,
+                              border: `1px solid ${theme.cardBorder}`,
+                              background: "#FBFCFE",
+                              color: theme.textPrimary,
+                              fontSize: 12,
+                              fontFamily: "'JetBrains Mono', monospace",
+                              boxSizing: "border-box",
+                              resize: "vertical",
+                              marginBottom: 10,
+                            }}
+                          />
 
-                              {activeConfig.customOperation === "INSERT" && (
-                                <>
-                                  <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                    Columns to INSERT
-                                  </label>
-                                  <div style={{ marginBottom: 14 }}>
-                                    <ColumnCheckboxGrid
-                                      headers={activeSheet.headers}
-                                      selected={activeConfig.guidedInsertColumns}
-                                      onToggle={(h) => toggleGuidedField(activeSheet.id, "guidedInsertColumns", h)}
-                                    />
-                                  </div>
-                                </>
-                              )}
-
-                              {activeConfig.customOperation === "UPDATE" && (
-                                <>
-                                  <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                    Columns to SET (update)
-                                  </label>
-                                  <div style={{ marginBottom: 14 }}>
-                                    <ColumnCheckboxGrid
-                                      headers={activeSheet.headers}
-                                      selected={activeConfig.guidedSetColumns}
-                                      onToggle={(h) => toggleGuidedField(activeSheet.id, "guidedSetColumns", h)}
-                                    />
-                                  </div>
-                                  <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                    Match rows WHERE (usually your key column, e.g. MemberId)
-                                  </label>
-                                  <div style={{ marginBottom: 14 }}>
-                                    <ColumnCheckboxGrid
-                                      headers={activeSheet.headers}
-                                      selected={activeConfig.guidedWhereColumns}
-                                      onToggle={(h) => toggleGuidedField(activeSheet.id, "guidedWhereColumns", h)}
-                                    />
-                                  </div>
-                                </>
-                              )}
-
-                              {activeConfig.customOperation === "DELETE" && (
-                                <>
-                                  <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                    Match rows WHERE (usually your key column, e.g. MemberId)
-                                  </label>
-                                  <div style={{ marginBottom: 14 }}>
-                                    <ColumnCheckboxGrid
-                                      headers={activeSheet.headers}
-                                      selected={activeConfig.guidedWhereColumns}
-                                      onToggle={(h) => toggleGuidedField(activeSheet.id, "guidedWhereColumns", h)}
-                                    />
-                                  </div>
-                                </>
-                              )}
-
-                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                Generated template (read-only — built from your selections above)
-                              </label>
-                              <pre
-                                style={{
-                                  margin: "0 0 10px",
-                                  padding: 10,
-                                  borderRadius: 8,
-                                  border: `1px solid ${theme.cardBorder}`,
-                                  background: theme.inputBg,
-                                  color: theme.textPrimary,
-                                  fontSize: 12,
-                                  fontFamily: "'JetBrains Mono', monospace",
-                                  whiteSpace: "pre-wrap",
-                                  minHeight: 44,
-                                }}
-                              >
-                                {getEffectiveTemplate(activeConfig) || "-- pick columns above to build the template --"}
-                              </pre>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => setShowCustomSqlHelp((v) => !v)}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  padding: 0,
-                                  marginBottom: showCustomSqlHelp ? 8 : 14,
-                                  fontSize: 11.5,
-                                  fontWeight: 600,
-                                  color: theme.brandBlue,
-                                }}
-                              >
-                                <ChevronDown
-                                  size={12}
-                                  style={{
-                                    transform: showCustomSqlHelp ? "rotate(0deg)" : "rotate(-90deg)",
-                                    transition: "transform 0.2s",
-                                  }}
-                                />
-                                How does Custom SQL work?
-                              </button>
-
-                              {showCustomSqlHelp && (
-                                <div
-                                  style={{
-                                    marginBottom: 14,
-                                    padding: "10px 12px",
-                                    borderRadius: 8,
-                                    background: theme.inputBg,
-                                    border: `1px solid ${theme.cardBorder}`,
-                                    fontSize: 11.5,
-                                    color: theme.textSecondary,
-                                    lineHeight: 1.6,
-                                  }}
-                                >
-                                  <b style={{ color: theme.textPrimary }}>What this does:</b> write SQL once, with
-                                  placeholders — it's repeated for every row in this sheet.
-                                  <br /><br />
-                                  <b style={{ color: theme.textPrimary }}>1. Click a tag</b> like{" "}
-                                  <code style={{ background: theme.brandBlueLight, padding: "1px 4px", borderRadius: 3, color: theme.brandBlueDark }}>
-                                    {"{{ColumnName}}"}
-                                  </code>{" "}
-                                  to insert it into your template.
-                                  <br />
-                                  <b style={{ color: theme.textPrimary }}>2. UPDATE/DELETE require a WHERE clause</b> —
-                                  otherwise every row in your real table is affected.
-                                  <br />
-                                  <b style={{ color: theme.textPrimary }}>3. Never wrap a tag in quotes</b> — write{" "}
-                                  <code style={{ background: theme.brandBlueLight, padding: "1px 4px", borderRadius: 3, color: theme.brandBlueDark }}>
-                                    {"{{Status}}"}
-                                  </code>
-                                  , not{" "}
-                                  <code style={{ background: theme.dangerBg, padding: "1px 4px", borderRadius: 3, color: theme.danger }}>
-                                    {"'{{Status}}'"}
-                                  </code>
-                                  . Quotes are added automatically for text values — adding your own doubles them
-                                  up and breaks the SQL.
-                                  <br /><br />
-                                  <b style={{ color: theme.textPrimary }}>Example (UPDATE):</b>
-                                  <pre style={{ margin: "4px 0 0", fontFamily: "monospace", fontSize: 11, whiteSpace: "pre-wrap", color: theme.textSecondary }}>
-{`UPDATE Members
-SET Status = {{Status}}
-WHERE MemberId = {{MemberId}};`}
-                                  </pre>
-                                </div>
-                              )}
-
-                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                Available tags (click to insert)
-                              </label>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 }}>
-                                {activeSheet.headers.map((h) => (
-                                  <button
-                                    key={h}
-                                    onClick={() =>
-                                      updateConfig(activeSheet.id, {
-                                        customTemplate: (activeConfig.customTemplate || "") + `{{${h}}}`,
-                                      })
-                                    }
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontFamily: "monospace",
-                                      padding: "3px 7px",
-                                      borderRadius: 5,
-                                      border: `1px solid ${theme.brandBlueBorder}`,
-                                      background: theme.brandBlueLight,
-                                      color: theme.brandBlueDark,
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    {`{{${h}}}`}
-                                  </button>
-                                ))}
-                              </div>
-
-                              <label style={{ fontSize: 12, color: theme.textSecondary, display: "block", marginBottom: 6 }}>
-                                SQL template (applied once per row — don't wrap tags in quotes)
-                              </label>
-                              <textarea
-                                value={activeConfig.customTemplate}
-                                onChange={(e) => updateConfig(activeSheet.id, { customTemplate: e.target.value })}
-                                placeholder={
-                                  activeConfig.customOperation === "INSERT"
-                                    ? "INSERT INTO MyTable (Col1, Col2) VALUES ({{Col1}}, {{Col2}});"
-                                    : "UPDATE MyTable SET Status = {{Status}} WHERE MemberId = {{MemberId}};"
-                                }
-                                rows={7}
-                                style={{
-                                  width: "100%",
-                                  padding: 10,
-                                  borderRadius: 8,
-                                  border: `1px solid ${theme.cardBorder}`,
-                                  background: theme.inputBg,
-                                  color: theme.textPrimary,
-                                  fontSize: 12,
-                                  fontFamily: "'JetBrains Mono', monospace",
-                                  boxSizing: "border-box",
-                                  resize: "vertical",
-                                  marginBottom: 10,
-                                }}
-                              />
-                            </>
-                          )}
-
+                          {/* Optional row filter — target specific rows instead of all */}
                           <div style={{ marginBottom: 12 }}>
                             <label
                               style={{
@@ -1173,7 +1199,7 @@ WHERE MemberId = {{MemberId}};`}
                                 style={{
                                   padding: 10,
                                   borderRadius: 8,
-                                  background: theme.inputBg,
+                                  background: "#FBFCFE",
                                   border: `1px solid ${theme.cardBorder}`,
                                 }}
                               >
@@ -1193,8 +1219,7 @@ WHERE MemberId = {{MemberId}};`}
                                     padding: "7px 8px",
                                     borderRadius: 6,
                                     border: `1px solid ${theme.cardBorder}`,
-                                    background: theme.inputBg,
-                                    color: theme.textPrimary,
+                                    background: "#fff",
                                     fontSize: 12,
                                     marginBottom: 10,
                                     boxSizing: "border-box",
@@ -1229,6 +1254,7 @@ WHERE MemberId = {{MemberId}};`}
                             )}
                           </div>
 
+                          {/* Live preview: rows/statements affected, tags, warnings */}
                           {customSqlPreview && (
                             <div
                               style={{
@@ -1275,15 +1301,16 @@ WHERE MemberId = {{MemberId}};`}
                             </div>
                           )}
 
+                          {/* Always-visible caution note */}
                           <div
                             style={{
                               marginBottom: 16,
                               padding: "8px 10px",
                               borderRadius: 8,
-                              background: theme.dangerBg,
-                              border: `1px solid ${theme.dangerBorder}`,
+                              background: "#FFF7ED",
+                              border: "1px solid #FED7AA",
                               fontSize: 11.5,
-                              color: theme.danger,
+                              color: "#9A3412",
                               lineHeight: 1.5,
                             }}
                           >
@@ -1307,7 +1334,7 @@ WHERE MemberId = {{MemberId}};`}
                                 padding: "9px 30px 9px 12px",
                                 borderRadius: 8,
                                 border: `1px solid ${theme.cardBorder}`,
-                                background: theme.inputBg,
+                                background: "#FBFCFE",
                                 color: theme.textPrimary,
                                 fontSize: 13,
                                 fontFamily: "monospace",
@@ -1358,7 +1385,7 @@ WHERE MemberId = {{MemberId}};`}
                                     padding: "6px 6px 6px 8px",
                                     borderRadius: 6,
                                     border: `1px solid ${checked ? theme.brandBlue : theme.cardBorder}`,
-                                    background: checked ? theme.brandBlueLight : theme.inputBg,
+                                    background: checked ? theme.brandBlueLight : "#FBFCFE",
                                     fontSize: 11.5,
                                   }}
                                 >
@@ -1397,7 +1424,7 @@ WHERE MemberId = {{MemberId}};`}
                                           padding: "2px 4px",
                                           borderRadius: 4,
                                           border: `1px solid ${theme.brandBlue}`,
-                                          background: theme.cardBg,
+                                          background: "#fff",
                                           color: theme.textPrimary,
                                         }}
                                       />
@@ -1505,8 +1532,8 @@ WHERE MemberId = {{MemberId}};`}
                       </div>
                       <pre
                         style={{
-                          background: theme.codeBg,
-                          border: `1px solid ${theme.codeBorder}`,
+                          background: theme.panelBg,
+                          border: `1px solid ${theme.panelBorder}`,
                           borderRadius: 10,
                           padding: "14px 14px 20px",
                           fontSize: 11.5,
@@ -1536,6 +1563,7 @@ WHERE MemberId = {{MemberId}};`}
                 </div>
               </div>
 
+              {/* RIGHT: export */}
               <div style={orangePanelStyle}>
                 <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: theme.brandBlue, margin: "0 0 12px", fontWeight: 700 }}>
                   Export
@@ -1582,7 +1610,7 @@ WHERE MemberId = {{MemberId}};`}
                             alignItems: "center",
                             padding: "8px 10px",
                             borderRadius: 7,
-                            background: theme.inputBg,
+                            background: "#FBFCFE",
                             border: `1px solid ${theme.cardBorder}`,
                           }}
                         >
